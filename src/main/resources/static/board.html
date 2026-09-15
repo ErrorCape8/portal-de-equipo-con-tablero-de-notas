@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero | Tablero de notas</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body data-authenticated="true">
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/dashboard.html"><span class="brand-mark">N</span> notas</a>
+        <p class="nav-label">Workspace</p>
+        <nav class="nav">
+            <a class="nav-link" href="/dashboard.html"><span class="nav-icon">◈</span>Resumen</a>
+            <a class="nav-link active" href="/board.html"><span class="nav-icon">□</span>Tablero</a>
+            <a class="nav-link" data-admin-only href="/admin.html"><span class="nav-icon">♙</span>Usuarios</a>
+        </nav>
+        <div class="sidebar-footer"><div class="profile-name" data-user-name>Usuario</div><div class="profile-role" data-user-role>USER</div><button class="logout" data-logout>Cerrar sesión</button></div>
+    </aside>
+    <main class="main">
+        <header class="topbar">
+            <div><p class="eyebrow">Vista libre</p><h1>El tablero.</h1><p class="subtitle">Arrastra cada nota hasta el lugar donde tenga más sentido.</p></div>
+            <button class="primary" id="new-note">+ Nueva nota</button>
+        </header>
+        <div class="toolbar"><span class="subtitle" id="note-count">Cargando...</span><button class="secondary" id="refresh">Actualizar</button></div>
+        <section class="board" id="board" aria-label="Tablero de notas"></section>
+    </main>
+</div>
+<div class="modal-backdrop hidden" id="modal-backdrop">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="section-head"><h2 id="modal-title">Nueva nota</h2><button class="icon-btn" id="close-modal" aria-label="Cerrar">×</button></div>
+        <form class="form-grid" id="note-form">
+            <div class="field"><label for="note-title">Título</label><input id="note-title" required maxlength="120"></div>
+            <div class="field"><label for="note-text">Texto</label><textarea id="note-text" maxlength="1000"></textarea></div>
+            <div class="field"><label for="note-status">Estado</label><select id="note-status"><option value="PENDIENTE">Pendiente</option><option value="EN_PROCESO">En proceso</option><option value="COMPLETADO">Completada</option></select></div>
+            <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Cancelar</button><button type="submit" class="primary">Guardar nota</button></div>
+        </form>
+    </section>
+</div>
+<script src="/app.js"></script>
+<script>
+let notes = [];
+let editingId = null;
+let drag = null;
+const board = document.getElementById('board');
+const modal = document.getElementById('modal-backdrop');
+const form = document.getElementById('note-form');
+
+async function loadNotes() {
+    notes = await api('/api/notes');
+    renderNotes();
+}
+function renderNotes() {
+    board.innerHTML = '';
+    document.getElementById('note-count').textContent = `${notes.length} ${notes.length === 1 ? 'nota' : 'notas'} en el tablero`;
+    if (!notes.length) { board.innerHTML = '<div class="empty">No hay notas todavía. Crea la primera para empezar.</div>'; return; }
+    notes.forEach((note, index) => {
+        const card = document.createElement('article');
+        card.className = `post-it ${['yellow','blue','pink','mint'][index % 4]}`;
+        card.dataset.id = note.id;
+        card.style.left = `${Math.max(10, note.positionX || 10)}px`;
+        card.style.top = `${Math.max(10, note.positionY || 10)}px`;
+        card.innerHTML = `<h3>${escapeHtml(note.title)}</h3><p>${escapeHtml(note.text || 'Sin texto')}</p><div class="post-footer"><span>${statusLabel(note.status)}</span><span><button class="icon-btn edit-note" aria-label="Editar nota">✎</button><button class="icon-btn delete-note" aria-label="Eliminar nota">×</button></span></div>`;
+        card.querySelector('.edit-note').addEventListener('click', (event) => { event.stopPropagation(); openEdit(note); });
+        card.querySelector('.delete-note').addEventListener('click', async (event) => { event.stopPropagation(); await removeNote(note.id); });
+        card.addEventListener('pointerdown', startDrag);
+        board.appendChild(card);
+    });
+}
+function startDrag(event) {
+    if (event.target.closest('button')) return;
+    const card = event.currentTarget;
+    const rect = card.getBoundingClientRect();
+    drag = { card, id: Number(card.dataset.id), offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+    card.setPointerCapture(event.pointerId);
+    card.addEventListener('pointermove', moveDrag);
+    card.addEventListener('pointerup', endDrag, { once: true });
+}
+function moveDrag(event) {
+    if (!drag) return;
+    const bounds = board.getBoundingClientRect();
+    const x = Math.max(8, Math.min(board.clientWidth - drag.card.offsetWidth - 8, event.clientX - bounds.left - drag.offsetX));
+    const y = Math.max(8, Math.min(board.clientHeight - drag.card.offsetHeight - 8, event.clientY - bounds.top - drag.offsetY));
+    drag.card.style.left = `${x}px`;
+    drag.card.style.top = `${y}px`;
+    drag.card.dataset.x = x;
+    drag.card.dataset.y = y;
+}
+async function endDrag() {
+    if (!drag) return;
+    const current = drag;
+    drag = null;
+    current.card.removeEventListener('pointermove', moveDrag);
+    if (current.card.dataset.x) {
+        try { await api(`/api/notes/${current.id}/position`, { method: 'PATCH', body: JSON.stringify({ positionX: Number(current.card.dataset.x), positionY: Number(current.card.dataset.y) }) }); showToast('Posición guardada'); }
+        catch (error) { showToast(error.message, true); }
+    }
+}
+function openCreate() {
+    editingId = null; document.getElementById('modal-title').textContent = 'Nueva nota'; form.reset(); document.getElementById('note-status').value = 'PENDIENTE'; modal.classList.remove('hidden'); document.getElementById('note-title').focus();
+}
+function openEdit(note) {
+    editingId = note.id; document.getElementById('modal-title').textContent = 'Editar nota'; document.getElementById('note-title').value = note.title; document.getElementById('note-text').value = note.text || ''; document.getElementById('note-status').value = note.status; modal.classList.remove('hidden'); document.getElementById('note-title').focus();
+}
+function closeModal() { modal.classList.add('hidden'); }
+async function removeNote(id) {
+    if (!confirm('¿Eliminar esta nota?')) return;
+    try { await api(`/api/notes/${id}`, { method: 'DELETE' }); notes = notes.filter(note => note.id !== id); renderNotes(); showToast('Nota eliminada'); } catch (error) { showToast(error.message, true); }
+}
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = { title: document.getElementById('note-title').value.trim(), text: document.getElementById('note-text').value, status: document.getElementById('note-status').value, positionX: 18, positionY: 18 };
+    try { if (editingId) await api(`/api/notes/${editingId}`, { method: 'PUT', body: JSON.stringify(body) }); else await api('/api/notes', { method: 'POST', body: JSON.stringify(body) }); closeModal(); await loadNotes(); showToast(editingId ? 'Nota actualizada' : 'Nota creada'); } catch (error) { showToast(error.message, true); }
+});
+document.getElementById('new-note').addEventListener('click', openCreate);
+document.getElementById('refresh').addEventListener('click', () => loadNotes().catch(error => showToast(error.message, true)));
+document.getElementById('close-modal').addEventListener('click', closeModal);
+document.getElementById('cancel-modal').addEventListener('click', closeModal);
+loadNotes().catch(error => showToast(error.message, true));
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen | Tablero de notas</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body data-authenticated="true">
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/dashboard.html"><span class="brand-mark">N</span> notas</a>
+        <p class="nav-label">Workspace</p>
+        <nav class="nav">
+            <a class="nav-link active" href="/dashboard.html"><span class="nav-icon">◈</span>Resumen</a>
+            <a class="nav-link" href="/board.html"><span class="nav-icon">□</span>Tablero</a>
+            <a class="nav-link" data-admin-only href="/admin.html"><span class="nav-icon">♙</span>Usuarios</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="profile-name" data-user-name>Usuario</div>
+            <div class="profile-role" data-user-role>USER</div>
+            <button class="logout" data-logout>Cerrar sesión</button>
+        </div>
+    </aside>
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Resumen personal</p>
+                <h1>Buenos días, <span data-user-name>ahí</span>.</h1>
+                <p class="subtitle">Una lectura rápida de lo que está pasando en tu tablero.</p>
+            </div>
+            <a class="primary" href="/board.html">Abrir tablero →</a>
+        </header>
+
+        <section class="grid stats" aria-label="Métricas">
+            <article class="card"><div class="stat-label">Total de notas</div><div class="stat-value" id="total">—</div><div class="stat-detail">en tu tablero</div></article>
+            <article class="card"><div class="stat-label">Pendientes</div><div class="stat-value" id="pending">—</div><div class="stat-detail">por empezar</div></article>
+            <article class="card"><div class="stat-label">En proceso</div><div class="stat-value" id="progress">—</div><div class="stat-detail">en movimiento</div></article>
+            <article class="card"><div class="stat-label">Completadas</div><div class="stat-value" id="done">—</div><div class="stat-detail">buen trabajo</div></article>
+        </section>
+
+        <section class="grid columns">
+            <article class="card">
+                <div class="section-head"><h2>Últimas notas</h2><a class="secondary" href="/board.html">Ver todas</a></div>
+                <div class="note-list" id="recent-notes"><div class="empty">Cargando notas...</div></div>
+            </article>
+            <article class="card">
+                <div class="section-head"><h2>Tu espacio</h2></div>
+                <p class="subtitle">Arrastra las notas en el tablero para organizar tus ideas. Cada movimiento se guarda automáticamente.</p>
+                <a class="primary" style="display:inline-block;margin-top:22px" href="/board.html">Crear una nota</a>
+                <div class="card hidden" data-admin-only style="margin-top:22px;background:#edf1eb;box-shadow:none"><div class="stat-label">Administración</div><p class="subtitle">Gestiona accesos, roles y estados de los usuarios.</p><a href="/admin.html" class="secondary" style="display:inline-block;margin-top:8px">Gestionar usuarios</a></div>
+            </article>
+        </section>
+    </main>
+</div>
+<script src="/app.js"></script>
+<script>
+(async function () {
+    try {
+        const notes = await api('/api/notes');
+        document.getElementById('total').textContent = notes.length;
+        document.getElementById('pending').textContent = notes.filter(n => n.status === 'PENDIENTE').length;
+        document.getElementById('progress').textContent = notes.filter(n => n.status === 'EN_PROCESO').length;
+        document.getElementById('done').textContent = notes.filter(n => n.status === 'COMPLETADO').length;
+        const recent = notes.slice().sort((a, b) => b.id - a.id).slice(0, 5);
+        document.getElementById('recent-notes').innerHTML = recent.length ? recent.map(note => `
+            <div class="note-row"><div><div class="note-title">${escapeHtml(note.title)}</div><div class="note-meta">${escapeHtml(note.text || 'Sin descripción')}</div></div><span class="badge ${statusClass(note.status)}">${statusLabel(note.status)}</span></div>`).join('') : '<div class="empty">Todavía no hay notas. El tablero está esperando una idea.</div>';
+    } catch (error) { showToast(error.message, true); }
+})();
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>

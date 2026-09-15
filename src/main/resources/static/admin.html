@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios | Tablero de notas</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body data-authenticated="true">
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/dashboard.html"><span class="brand-mark">N</span> notas</a>
+        <p class="nav-label">Workspace</p>
+        <nav class="nav">
+            <a class="nav-link" href="/dashboard.html"><span class="nav-icon">◈</span>Resumen</a>
+            <a class="nav-link" href="/board.html"><span class="nav-icon">□</span>Tablero</a>
+            <a class="nav-link active" href="/admin.html"><span class="nav-icon">♙</span>Usuarios</a>
+        </nav>
+        <div class="sidebar-footer"><div class="profile-name" data-user-name>Usuario</div><div class="profile-role" data-user-role>ADMIN</div><button class="logout" data-logout>Cerrar sesión</button></div>
+    </aside>
+    <main class="main">
+        <header class="topbar">
+            <div><p class="eyebrow">Control de acceso</p><h1>Usuarios.</h1><p class="subtitle">Administra quién puede entrar y qué puede hacer en el tablero.</p></div>
+            <button class="primary" id="new-user">+ Nuevo usuario</button>
+        </header>
+        <div class="toolbar"><input class="search" id="search" style="max-width:320px" type="search" placeholder="Buscar por nombre o email"><span class="subtitle" id="user-count">Cargando...</span></div>
+        <section class="table-wrap">
+            <table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="users"></tbody></table>
+        </section>
+    </main>
+</div>
+<div class="modal-backdrop hidden" id="modal-backdrop">
+    <section class="modal" role="dialog" aria-modal="true">
+        <div class="section-head"><h2 id="modal-title">Nuevo usuario</h2><button class="icon-btn" id="close-modal" aria-label="Cerrar">×</button></div>
+        <form class="form-grid" id="user-form">
+            <div class="field"><label for="user-name">Nombre</label><input id="user-name" required maxlength="120"></div>
+            <div class="field"><label for="user-email">Correo electrónico</label><input id="user-email" type="email" required></div>
+            <div class="field"><label for="user-password">Contraseña <span id="password-hint">(obligatoria)</span></label><input id="user-password" type="password" autocomplete="new-password"></div>
+            <div class="field"><label for="user-role">Rol</label><select id="user-role"><option value="USER">USER</option><option value="ADMIN">ADMIN</option></select></div>
+            <div class="field"><label for="user-active">Estado</label><select id="user-active"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+            <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Cancelar</button><button type="submit" class="primary">Guardar usuario</button></div>
+        </form>
+    </section>
+</div>
+<script src="/app.js"></script>
+<script>
+let users = [];
+let editingId = null;
+const modal = document.getElementById('modal-backdrop');
+const form = document.getElementById('user-form');
+async function loadUsers() { users = await api('/api/admin/users'); renderUsers(); }
+function renderUsers() {
+    const query = document.getElementById('search').value.toLowerCase().trim();
+    const visible = users.filter(user => `${user.name} ${user.email}`.toLowerCase().includes(query));
+    document.getElementById('user-count').textContent = `${visible.length} de ${users.length} usuarios`;
+    document.getElementById('users').innerHTML = visible.length ? visible.map(user => `<tr><td><strong>${escapeHtml(user.name)}</strong><div class="note-meta">${escapeHtml(user.email)}</div></td><td><span class="badge ${user.role === 'ADMIN' ? 'progress' : ''}">${user.role}</span></td><td><span class="badge ${user.active ? 'done' : 'inactive'}">${user.active ? 'Activo' : 'Inactivo'}</span></td><td><div class="actions"><button class="small-btn edit-user" data-id="${user.id}">Editar</button><button class="small-btn toggle-user" data-id="${user.id}">${user.active ? 'Desactivar' : 'Activar'}</button></div></td></tr>`).join('') : '<tr><td colspan="4" class="empty">No se encontraron usuarios.</td></tr>';
+    document.querySelectorAll('.edit-user').forEach(button => button.addEventListener('click', () => openEdit(Number(button.dataset.id))));
+    document.querySelectorAll('.toggle-user').forEach(button => button.addEventListener('click', () => toggleUser(Number(button.dataset.id))));
+}
+function openCreate() { editingId = null; document.getElementById('modal-title').textContent = 'Nuevo usuario'; document.getElementById('password-hint').textContent = '(obligatoria)'; form.reset(); document.getElementById('user-active').value = 'true'; modal.classList.remove('hidden'); document.getElementById('user-name').focus(); }
+function openEdit(id) { const user = users.find(item => item.id === id); editingId = id; document.getElementById('modal-title').textContent = 'Editar usuario'; document.getElementById('password-hint').textContent = '(dejar vacía para conservarla)'; document.getElementById('user-name').value = user.name; document.getElementById('user-email').value = user.email; document.getElementById('user-password').value = ''; document.getElementById('user-role').value = user.role; document.getElementById('user-active').value = String(user.active); modal.classList.remove('hidden'); document.getElementById('user-name').focus(); }
+function closeModal() { modal.classList.add('hidden'); }
+async function toggleUser(id) { const user = users.find(item => item.id === id); try { await api(`/api/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ active: !user.active }) }); await loadUsers(); showToast(user.active ? 'Usuario desactivado' : 'Usuario activado'); } catch (error) { showToast(error.message, true); } }
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = document.getElementById('user-password').value;
+    const body = { name: document.getElementById('user-name').value.trim(), email: document.getElementById('user-email').value.trim(), password, role: document.getElementById('user-role').value, active: document.getElementById('user-active').value === 'true' };
+    if (!editingId && !password) { showToast('La contraseña es obligatoria', true); return; }
+    try { await api(editingId ? `/api/admin/users/${editingId}` : '/api/admin/users', { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }); closeModal(); await loadUsers(); showToast(editingId ? 'Usuario actualizado' : 'Usuario creado'); } catch (error) { showToast(error.message, true); }
+});
+document.getElementById('new-user').addEventListener('click', openCreate);
+document.getElementById('search').addEventListener('input', renderUsers);
+document.getElementById('close-modal').addEventListener('click', closeModal);
+document.getElementById('cancel-modal').addEventListener('click', closeModal);
+loadUsers().catch(error => showToast(error.message, true));
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>

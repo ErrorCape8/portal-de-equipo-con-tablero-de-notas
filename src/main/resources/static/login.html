@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar | Tablero de notas</title>
+    <style>
+        :root {
+            --ink: #17202a;
+            --muted: #6b747d;
+            --paper: #fffdf8;
+            --line: #e7e0d5;
+            --accent: #e36d4f;
+            --accent-dark: #b94d35;
+            --night: #24343a;
+            --success: #2f7d62;
+            --shadow: 0 24px 70px rgba(36, 52, 58, 0.16);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            color: var(--ink);
+            background: #e9efe9;
+            font-family: Georgia, "Times New Roman", serif;
+        }
+
+        .page {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px 18px;
+            background:
+                linear-gradient(125deg, rgba(255, 253, 248, 0.92), rgba(234, 241, 232, 0.82)),
+                repeating-linear-gradient(0deg, transparent 0 38px, rgba(36, 52, 58, 0.035) 39px 40px);
+        }
+
+        .shell {
+            width: min(100%, 980px);
+            min-height: 580px;
+            display: grid;
+            grid-template-columns: 0.9fr 1.1fr;
+            overflow: hidden;
+            background: var(--paper);
+            border: 1px solid rgba(36, 52, 58, 0.12);
+            box-shadow: var(--shadow);
+        }
+
+        .intro {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px;
+            color: #f8f5ed;
+            background: var(--night);
+        }
+
+        .mark {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            color: var(--night);
+            background: var(--accent);
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+        .eyebrow {
+            margin: 34px 0 12px;
+            color: #f3a18b;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            max-width: 330px;
+            margin: 0;
+            font-size: clamp(42px, 6vw, 68px);
+            line-height: 0.95;
+            font-weight: normal;
+        }
+
+        .intro-copy {
+            max-width: 300px;
+            margin: 22px 0 0;
+            color: #cbd2cb;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .note {
+            max-width: 270px;
+            margin: 0;
+            color: #aebbb4;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .form-panel {
+            display: flex;
+            align-items: center;
+            padding: 48px clamp(28px, 7vw, 86px);
+        }
+
+        .form-wrap { width: 100%; max-width: 360px; margin: auto; }
+
+        .form-kicker {
+            margin: 0 0 10px;
+            color: var(--accent-dark);
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 38px;
+            font-weight: normal;
+        }
+
+        .subtitle {
+            margin: 0 0 32px;
+            color: var(--muted);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            margin: 20px 0 8px;
+            color: var(--ink);
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px 14px;
+            border: 1px solid var(--line);
+            border-radius: 0;
+            color: var(--ink);
+            background: #fff;
+            font: 15px Arial, sans-serif;
+            outline: none;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(227, 109, 79, 0.14);
+        }
+
+        button {
+            width: 100%;
+            margin-top: 28px;
+            padding: 16px 18px;
+            border: 0;
+            color: #fffdf8;
+            background: var(--accent);
+            font: bold 13px Arial, sans-serif;
+            letter-spacing: 0.4px;
+            cursor: pointer;
+            transition: background 160ms ease, transform 160ms ease;
+        }
+
+        button:hover { background: var(--accent-dark); transform: translateY(-1px); }
+        button:disabled { cursor: wait; opacity: 0.65; transform: none; }
+
+        .message {
+            min-height: 20px;
+            margin: 18px 0 0;
+            font: 13px/1.5 Arial, sans-serif;
+        }
+
+        .message.error { color: #b43e35; }
+        .message.success { color: var(--success); }
+
+        .demo-hint {
+            margin-top: 28px;
+            padding-top: 18px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font: 12px/1.5 Arial, sans-serif;
+        }
+
+        @media (max-width: 720px) {
+            .page { padding: 0; }
+            .shell { min-height: 100vh; grid-template-columns: 1fr; }
+            .intro { min-height: 290px; padding: 28px; }
+            .intro-copy { margin-top: 16px; }
+            .note { display: none; }
+            .form-panel { padding: 40px 28px 52px; }
+            h1 { font-size: 48px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="shell" aria-label="Inicio de sesión">
+            <div class="intro">
+                <div>
+                    <div class="mark" aria-hidden="true">N</div>
+                    <p class="eyebrow">Workspace personal</p>
+                    <h1>Ordena tus ideas.</h1>
+                    <p class="intro-copy">Un espacio tranquilo para capturar, mover y completar tus notas.</p>
+                </div>
+                <p class="note">Tus notas están protegidas. Inicia sesión para entrar al tablero.</p>
+            </div>
+
+            <div class="form-panel">
+                <div class="form-wrap">
+                    <p class="form-kicker">Bienvenido de vuelta</p>
+                    <h2>Entrar</h2>
+                    <p class="subtitle">Usa tu correo y contraseña para continuar.</p>
+
+                    <form id="login-form">
+                        <label for="email">Correo electrónico</label>
+                        <input id="email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" required>
+
+                        <label for="password">Contraseña</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Tu contraseña" required>
+
+                        <button id="submit-button" type="submit">Entrar al tablero</button>
+                        <p id="message" class="message" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <p class="demo-hint">La sesión se mantiene en este navegador mientras el token siga vigente.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const button = document.getElementById('submit-button');
+        const message = document.getElementById('message');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            message.textContent = '';
+            message.className = 'message';
+            button.disabled = true;
+            button.textContent = 'Comprobando...';
+
+            const payload = {
+                email: form.email.value.trim(),
+                password: form.password.value
+            };
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'No se pudo iniciar sesión.');
+                }
+
+                localStorage.setItem('jwt', data.token);
+                localStorage.setItem('user', JSON.stringify({
+                    name: data.name,
+                    email: data.email,
+                    role: data.role
+                }));
+                message.textContent = `Sesión iniciada como ${data.name}. Token guardado en este navegador.`;
+                message.className = 'message success';
+                form.reset();
+                setTimeout(() => { window.location.href = '/dashboard.html'; }, 450);
+            } catch (error) {
+                message.textContent = error.message || 'No se pudo conectar con la API.';
+                message.className = 'message error';
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Entrar al tablero';
+            }
+        });
+    </script>
+</body>
+</html>
