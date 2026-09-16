@@ -10,7 +10,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: dashboard-metrics
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Handler: index.handler
       CodeUri: ../lambda/dashboard-metrics/
       Timeout: 5
@@ -61,7 +61,7 @@ Resources:
   BackendInstance:
     Type: AWS::EC2::Instance
     Properties:
-      InstanceType: t2.micro
+      InstanceType: t3.micro
       ImageId: ami-0c101f26f147fa7fd
       IamInstanceProfile:
         Ref: Ec2InstanceProfile
@@ -83,5 +83,77 @@ Resources:
 
             cd /home/ec2-user
             git clone https://github.com/ErrorCape8/portal-de-equipo-con-tablero-de-notas.git app
-            cd app/tablerodenotas
+            cd app
             docker-compose up -d --build
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub portal-equipo-frontend-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FrontendOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: portal-equipo-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: login.html
+        Origins:
+          - Id: frontend-s3-origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOriginAccessControl
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: frontend-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          ForwardedValues:
+            QueryString: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}
+
+Outputs:
+  BackendPublicIp:
+    Description: IP publica de la EC2 donde corre la API
+    Value: !GetAtt BackendInstance.PublicIp
+
+  BackendApiUrl:
+    Description: URL base de la API (usar en frontend/js/config.js o app.js)
+    Value: !Sub http://${BackendInstance.PublicIp}:8080
+
+  FrontendUrl:
+    Description: URL publica del frontend (CloudFront)
+    Value: !Sub https://${FrontendDistribution.DomainName}
+
+  FrontendBucketName:
+    Description: Bucket donde subir los archivos de frontend/
+    Value: !Ref FrontendBucket
