@@ -25,8 +25,24 @@ services:
     volumes:
       - ./lambda:/lambda-src
       - ./localstack-init:/etc/localstack/init/ready.d
-
       - /var/run/docker.sock:/var/run/docker.sock
+
+  backend:
+    build: .
+    container_name: portal-backend
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - localstack
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/portal_db
+      SPRING_DATASOURCE_USERNAME: portal_user
+      SPRING_DATASOURCE_PASSWORD: portal_pass
+      APP_AWS_LAMBDA_ENDPOINT: http://localstack:4566
+      APP_AWS_ACCESS_KEY: test
+      APP_AWS_SECRET_KEY: test
+    ports:
+      - "8080:8080"
 
 volumes:
   mysql_data:

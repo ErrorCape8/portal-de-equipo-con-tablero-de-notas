@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Portal de equipo con tablero de notas - infraestructura AWS
+  (Lambda de metricas, EC2 con la API, S3+CloudFront para el frontend)
+
+Resources:
+
+  DashboardMetricsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: dashboard-metrics
+      Runtime: nodejs18.x
+      Handler: index.handler
+      CodeUri: ../lambda/dashboard-metrics/
+      Timeout: 5
+      MemorySize: 128
+
+  Ec2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeDashboardMetricsLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  Fn::GetAtt:
+                    - DashboardMetricsFunction
+                    - Arn
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Ec2InstanceRole
