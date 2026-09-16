@@ -57,11 +57,19 @@
 <script>
 (async function () {
     try {
-        const notes = await api('/api/notes');
-        document.getElementById('total').textContent = notes.length;
-        document.getElementById('pending').textContent = notes.filter(n => n.status === 'PENDIENTE').length;
-        document.getElementById('progress').textContent = notes.filter(n => n.status === 'EN_PROCESO').length;
-        document.getElementById('done').textContent = notes.filter(n => n.status === 'COMPLETADO').length;
+        const [metrics, notes] = await Promise.all([api('/api/dashboard/metrics'), api('/api/notes')]);
+        if (metrics.available) {
+            document.getElementById('total').textContent = metrics.total;
+            document.getElementById('pending').textContent = metrics.pending;
+            document.getElementById('progress').textContent = metrics.progress;
+            document.getElementById('done').textContent = metrics.done;
+        } else {
+            document.getElementById('total').textContent = metrics.message || 'Metricas no disponibles';
+            document.getElementById('pending').textContent = '—';
+            document.getElementById('progress').textContent = '—';
+            document.getElementById('done').textContent = '—';
+            showToast(metrics.message || 'No se pudieron calcular las metricas', true);
+        }
         const recent = notes.slice().sort((a, b) => b.id - a.id).slice(0, 5);
         document.getElementById('recent-notes').innerHTML = recent.length ? recent.map(note => `
             <div class="note-row"><div><div class="note-title">${escapeHtml(note.title)}</div><div class="note-meta">${escapeHtml(note.text || 'Sin descripción')}</div></div><span class="badge ${statusClass(note.status)}">${statusLabel(note.status)}</span></div>`).join('') : '<div class="empty">Todavía no hay notas. El tablero está esperando una idea.</div>';
