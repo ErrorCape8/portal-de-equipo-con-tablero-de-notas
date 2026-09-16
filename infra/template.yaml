@@ -42,4 +42,46 @@ Resources:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - !Ref Ec2InstanceRole
+        - Ref: Ec2InstanceRole
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite SSH y el trafico de la API del backend
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-0c101f26f147fa7fd
+      IamInstanceProfile:
+        Ref: Ec2InstanceProfile
+      SecurityGroupIds:
+        - Ref: BackendSecurityGroup
+      Tags:
+        - Key: Name
+          Value: portal-equipo-backend
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            yum update -y
+            yum install -y docker git
+            systemctl start docker
+            systemctl enable docker
+            curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+
+            cd /home/ec2-user
+            git clone https://github.com/ErrorCape8/portal-de-equipo-con-tablero-de-notas.git app
+            cd app/tablerodenotas
+            docker-compose up -d --build
